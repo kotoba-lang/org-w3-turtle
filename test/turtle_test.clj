@@ -3,14 +3,15 @@
             [clojure.java.shell :as shell]
             [clojure.test :refer [deftest is testing]]
             [kotoba.compiler.core :as compiler]
-            [kotoba.compiler.ir :as ir]))
+            [kotoba.kir :as ir]))
 
 (def source (slurp "src/turtle.kotoba"))
 (defn call [kir function & args] (ir/execute kir function (vec args)))
 (defn dstr [value] ["string" value])
 (defn dkw [value] ["keyword" value])
 (defn dmap [entries]
-  ["map" (->> entries (sort-by (comp str key)) (mapv (fn [[key value]] [key value])))])
+  ["map" (->> entries (sort-by (comp str key))
+              (mapv (fn [[key value]] [(dkw key) value])))])
 (defn dvec [& values] ["vector" (vec values)])
 (defn iri [value] (dmap {:rdf/type (dkw :iri) :value (dstr value)}))
 (defn blank [value] (dmap {:id (dstr value) :rdf/type (dkw :blank)}))
@@ -56,11 +57,12 @@
                (str "import(process.argv[1]).then(async host=>{"
                     "const j=await import('data:text/javascript;base64," js64 "');"
                     "const w=await host.instantiateKotoba(Buffer.from(process.argv[2],'base64'));"
-                    "const iri=v=>['map',[[':rdf/type',['keyword',':iri']],[':value',['string',v]]]];"
-                    "const lit=v=>['map',[[':rdf/type',['keyword',':literal']],[':value',['string',v]]]];"
-                    "const t=['map',[[':object',lit('o')],[':predicate',iri('p')],[':subject',iri('s')]]];"
-                    "const ts=['vector',[t]],ps=['map',[[':ex',['string','https://example.test/']]]];"
-                    "const bad=['map',[[':rdf/type',['keyword',':unknown']]]];"
+                    "const map=e=>['map',e.map(([k,v])=>[['keyword',k],v])];"
+                    "const iri=v=>map([[':rdf/type',['keyword',':iri']],[':value',['string',v]]]);"
+                    "const lit=v=>map([[':rdf/type',['keyword',':literal']],[':value',['string',v]]]);"
+                    "const t=map([[':object',lit('o')],[':predicate',iri('p')],[':subject',iri('s')]]);"
+                    "const ts=['vector',[t]],ps=map([[':ex',['string','https://example.test/']]]);"
+                    "const bad=map([[':rdf/type',['keyword',':unknown']]]);"
                     "const run=(x,doc)=>{if(x.triple(doc(t))!=='<s> <p> \\\"o\\\" .')throw Error('triple');"
                     "if(x['turtle$arity$1'](doc(ts))!=='<s> <p> \\\"o\\\" .')throw Error('one');"
                     "if(x['turtle$arity$2'](doc(ps),doc(ts))!=='@prefix ex: <https://example.test/> .\\n\\n<s> <p> \\\"o\\\" .')throw Error('prefix');"
