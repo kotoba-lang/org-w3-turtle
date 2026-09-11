@@ -11,5 +11,5 @@ and rejection behavior across reference, restricted JavaScript and typed Wasm.
 ## Test
 
 ```bash
-clojure -M:test
+kbb -M:test
 ```
